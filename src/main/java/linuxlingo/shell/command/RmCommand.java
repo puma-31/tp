@@ -34,7 +34,7 @@ public class RmCommand implements Command {
             return CommandResult.error("rm: missing operand");
         }
 
-        for (String path: paths) {
+        for (String path : paths) {
             try {
                 session.getVfs().delete(path, session.getWorkingDir(), recursive, force);
             } catch (VfsException e) {
