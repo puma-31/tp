@@ -51,20 +51,55 @@ public class ExamSession {
      * Interactive mode: prompt user for topic, count, run exam, display results.
      */
     public void startInteractive() {
-        // TODO: Implement startInteractive
-        //  1. List<String> topics = questionBank.getTopics()
-        //     If empty → ui.println("No question banks available."); return
-        //  2. listTopics()   — show numbered list
-        //  3. String topicInput = ui.readLine("Select topic (number or name): ")
-        //     Parse as int → topics.get(index - 1), or match by name via hasTopic()
-        //     If invalid → ui.println("Invalid topic selection."); return
-        //  4. int total = questionBank.getQuestionCount(selectedTopic)
-        //     String countInput = ui.readLine("How many questions? (1-" + total + ", default: all): ")
-        //     Parse as int, clamp to [1, total]
-        //  5. List<Question> questions = questionBank.getQuestions(selectedTopic, count, false)
-        //  6. ExamResult result = runExam(questions)
-        //  7. ui.println("\n" + result.display())
-        throw new UnsupportedOperationException("TODO: implement ExamSession.startInteractive()");
+        List<String> topics = questionBank.getTopics();
+        if (topics.isEmpty()) {
+            ui.println("No question banks available.");
+            return;
+        }
+
+        listTopics();
+        String topicInput = ui.readLine("Select topic (number or name): ");
+        if (topicInput == null) {
+            ui.println("Invalid topic selection.");
+            return;
+        }
+
+        String selectedTopic = null;
+        String trimmedTopicInput = topicInput.trim();
+        try {
+            int index = Integer.parseInt(trimmedTopicInput);
+            if (index >= 1 && index <= topics.size()) {
+                selectedTopic = topics.get(index - 1);
+            }
+        } catch (NumberFormatException e) {
+            if (questionBank.hasTopic(trimmedTopicInput)) {
+                selectedTopic = trimmedTopicInput;
+            }
+        }
+
+        if (selectedTopic == null) {
+            ui.println("Invalid topic selection.");
+            return;
+        }
+
+        int total = questionBank.getQuestionCount(selectedTopic);
+        String countInput = ui.readLine("How many questions? (1-" + total + ", default: all): ");
+
+        int count;
+        if (countInput != null && !countInput.trim().isEmpty()) {
+            try {
+                count = Integer.parseInt(countInput.trim());
+            } catch (NumberFormatException e) {
+                count = total;
+            }
+        } else {
+            count = total;
+        }
+
+        count = Math.max(1, Math.min(count, total));
+        List<Question> questions = questionBank.getQuestions(selectedTopic, count, false);
+        ExamResult result = runExam(questions);
+        ui.println("\n" + result.display());
     }
 
     /**
@@ -75,38 +110,48 @@ public class ExamSession {
      * @param random whether to shuffle
      */
     public void startWithArgs(String topic, int count, boolean random) {
-        // TODO: Implement startWithArgs
-        //  1. If !questionBank.hasTopic(topic) → print error + listTopics(); return
-        //  2. int total = questionBank.getQuestionCount(topic)
-        //     if count <= 0 → count = total; clamp to total
-        //  3. List<Question> questions = questionBank.getQuestions(topic, count, random)
-        //  4. ExamResult result = runExam(questions)
-        //  5. ui.println("\n" + result.display())
-        throw new UnsupportedOperationException("TODO: implement ExamSession.startWithArgs()");
+        if (!questionBank.hasTopic(topic)) {
+            ui.println("Invalid topic selection.");
+            listTopics();
+            return;
+        }
+        int total = questionBank.getQuestionCount(topic);
+        if (count <= 0) {
+            count = total;
+        }
+        count = Math.min(count, total);
+        List<Question> questions = questionBank.getQuestions(topic, count, random);
+        ExamResult result = runExam(questions);
+        ui.println("\n" + result.display());
     }
 
     /**
      * Single random question mode: present one question from any topic.
      */
     public void runOneRandom() {
-        // TODO: Implement runOneRandom
-        //  1. Question q = questionBank.getRandomQuestion()
-        //     If null → ui.println("No questions available."); return
-        //  2. presentQuestion(q, 1, 1)
-        throw new UnsupportedOperationException("TODO: implement ExamSession.runOneRandom()");
+        Question q = questionBank.getRandomQuestion();
+        if (q == null) {
+            ui.println("No questions available.");
+            return;
+        }
+        presentQuestion(q, 1, 1);
     }
 
     /**
      * Print all available topics with question counts (numbered list).
      */
     public void listTopics() {
-        // TODO: Implement listTopics
-        //  1. List<String> topics = questionBank.getTopics()
-        //     If empty → ui.println("No topics available."); return
-        //  2. ui.println("Available topics:")
-        //  3. For each (i, topic):
-        //     ui.println("  " + (i+1) + ". " + topic + " (" + count + " questions)")
-        throw new UnsupportedOperationException("TODO: implement ExamSession.listTopics()");
+        List<String> topics = questionBank.getTopics();
+        if (topics.isEmpty()) {
+            ui.println("No topics available.");
+            return;
+        }
+        ui.println("Available topics:");
+        for (int i = 0; i < topics.size(); i++) {
+            String topic = topics.get(i);
+            int count = questionBank.getQuestionCount(topic);
+            ui.println("  " + (i + 1) + ". " + topic + " (" + count + " questions)");
+        }
     }
 
     // ─── Private helpers ─────────────────────────────────────────
@@ -115,13 +160,31 @@ public class ExamSession {
      * Run through a list of questions, accumulate results.
      */
     private ExamResult runExam(List<Question> questions) {
-        // TODO: Implement runExam
-        //  ExamResult result = new ExamResult();
-        //  For each question (i = 0..size-1):
-        //    boolean correct = presentQuestion(q, i+1, questions.size())
-        //    result.addResult(q, userAnswer, correct)
-        //  return result
-        throw new UnsupportedOperationException("TODO: implement ExamSession.runExam()");
+        ExamResult result = new ExamResult();
+        for (int i = 0; i < questions.size(); i++) {
+            Question q = questions.get(i);
+
+            if (q instanceof PracQuestion pq) {
+                boolean correct = handlePracQuestion(pq);
+                result.addResult(q, "", correct);
+            } else {
+                ui.println("[Q" + (i + 1) + "/" + questions.size() + "] " + q.present());
+                String userAnswer = ui.readLine("Your answer: ");
+                if (userAnswer == null || userAnswer.trim().equalsIgnoreCase("quit")) {
+                    result.addResult(q, "", false);
+                } else {
+                    boolean correct = q.checkAnswer(userAnswer);
+                    if (correct) {
+                        ui.println("✓ Correct!");
+                    } else {
+                        ui.println("✗ Incorrect.");
+                    }
+                    ui.println("Explanation: " + q.getExplanation());
+                    result.addResult(q, userAnswer, correct);
+                }
+            }
+        }
+        return result;
     }
 
     /**
@@ -137,15 +200,11 @@ public class ExamSession {
      * @return true if the user answered correctly
      */
     private boolean presentQuestion(Question q, int index, int total) {
-        // TODO: Implement presentQuestion
-        //  1. ui.println("[Q" + index + "/" + total + "] " + q.present())
-        //  2. If q instanceof PracQuestion pq → return handlePracQuestion(pq)
-        //  3. String answer = ui.readLine("Your answer: ")
-        //     If null or "quit" → skip (return false)
-        //  4. boolean correct = q.checkAnswer(answer)
-        //  5. Print ✓/✗ + explanation
-        //  6. return correct
-        throw new UnsupportedOperationException("TODO: implement ExamSession.presentQuestion()");
+        if (q instanceof PracQuestion pq) {
+            ui.println("[Q" + index + "/" + total + "] " + q.present());
+            return handlePracQuestion(pq);
+        }
+        return false;
     }
 
     /**
@@ -155,15 +214,20 @@ public class ExamSession {
      * @return true if VFS matches all checkpoints
      */
     private boolean handlePracQuestion(PracQuestion q) {
-        // TODO: Implement handlePracQuestion
-        //  1. ui.println(">> Entering Shell Simulator...")
-        //     ui.println("   Complete the task and type 'done' when finished.\n")
-        //  2. VirtualFileSystem tempVfs = vfsFactory.get()
-        //  3. ShellSession tempSession = new ShellSession(tempVfs, ui)
-        //  4. tempSession.start()   // blocks until "done"/"back"
-        //  5. boolean correct = q.checkVfs(tempVfs)
-        //  6. Print ✓/✗ + explanation
-        //  7. return correct
-        throw new UnsupportedOperationException("TODO: implement ExamSession.handlePracQuestion()");
+        ui.println(">> Entering Shell Simulator...");
+        ui.println("   Complete the task and type 'done' when finished.\n");
+
+        VirtualFileSystem tempVfs = vfsFactory.get();
+        ShellSession tempSession = new ShellSession(tempVfs, ui);
+        tempSession.start();
+
+        boolean correct = q.checkVfs(tempVfs);
+        if (correct) {
+            ui.println("✓ Correct!");
+        } else {
+            ui.println("✗ Incorrect.");
+        }
+        ui.println("Explanation: " + q.getExplanation());
+        return correct;
     }
 }
