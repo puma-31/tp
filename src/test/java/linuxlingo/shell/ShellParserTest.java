@@ -61,5 +61,16 @@ class ShellParserTest {
         assertEquals("cd", plan.segments.get(1).commandName);
     }
 
+    @Test
+    public void parse_commandWithMultipleArgs_parsesCorrectly() {
+        ShellParser.ParsedPlan plan = parser.parse("cp file1 file2 dir");
+        assertEquals(1, plan.segments.size());
+        assertEquals("cp", plan.segments.get(0).commandName);
+        assertEquals(3, plan.segments.get(0).args.length);
+        assertEquals("file1", plan.segments.get(0).args[0]);
+        assertEquals("file2", plan.segments.get(0).args[1]);
+        assertEquals("dir", plan.segments.get(0).args[2]);
+    }
+
 
 }
